@@ -620,3 +620,144 @@ def synthesizer(state: State):
 ## 3.5 评估器-优化器模式
 
 前面我们实现的 【案例二】基于 LangGraph 的代理式 RAG 系统 就是评估器、优化器模式，核心在于**质量检测机制**。评估器决定生成结果是否合格，不合格就交给优化器优化问题，重新生成
+
+# 一、LangGraph 持久化
+
+## 1.1 线程级持久化
+
+### 1.2.1 “线程”是指什么？
+
+这里的**线程**和操作系统中的线程**是两个完全不同的概念**。
+
+操作系统中的线程，是进程中的执行流，是操作系统调度的基本单位；而 LangGraph 中的线程，指的是一个对话流，把这个对话流的状态保存下来，其他对话流不可见，具有**隔离性**
+
+### 1.2.2 检查点
+
+在 LangGraph 的线程级持久化中，每当到达检查点时，都会将会话状态完整的保存下来形成**状态快照**，并且是**追加式**的更新，如果中途出现出错重启，能够回滚到对话的任意时间点的状态
+
+在我们设计的工作流中，每完成一个 `super_step` 就进行一次状态保存，即：在我们设计的工作流中，每结束一个节点，就会进行一次状态保存
+
+### 1.2.3 线程级持久化使用姿势
+
+#### 1.2.3.1 内存存储 
+
+使用 `langgraph.checkpoint.InMemoryStore`，使用在内存中的线程级持久化，状态快照生命周期只在当前线程进行中。
+
+#### 1.2.3.2 Postgres SQL
+
+Postgres SQL 是和 MySQL 类似的关系型数据库，LangGraph 中支持直接使用 PostgresSQL 作为线程级持久化的使用姿势。
+
+* 首先，使用 docker 拉取 Postgres SQL 镜像
+
+```shell
+sudo docker pull postgres:latest
+```
+
+* 启动 postgres 容器，并指定端口映射、用户名、密码等
+
+```shell
+sudo docker run -d\
+	--name postgres\
+	-p 5432:5432\
+	-e POSTGRES_USER=postgres\
+	-e POSTGRES_PASSWORD=bit\
+    -e POSTGRES_DB=postgres   postgres
+```
+
+* 在 LangGraph 中配置 Postgres 连接，并将其作为 `checkpointer`，导入 `langchain-checkpoint-postgres` 包
+
+	* 注意，第一次使用 check_point，要调用 `setup`
+	* 这里使用的语法是 Python 的上下文管理器，类似于 Cpp 的 RAII 机制，自动管理资源的释放，防止遗忘、疏忽导致的资源泄漏。作用域在上下文管理器的范围中，除了范围自动释放
+```python
+DB_URL = "postgres://postgres:bit@localhost:5432/postgres"  
+with PostgresSaver.from_conn_string(DB_URL) as check_point:  
+    check_point.setup()
+```
+
+* 开启检查点、指定 thread_id
+
+	* `thread_id` 是 LangGraph 用来对 Thread 进行区分的，若第一次调用没有查到则创建线程，否则从 Postgres 中根据 `thread_id` 取出上次的状态快照，继续使用
+
+```python
+final_graph = state_graph.compile(checkpointer=check_point)  
+config={"configurable": {"thread_id": 1}}  
+result = final_graph.invoke(  
+    {  
+        "messages": [  
+            HumanMessage(content="1 + 1 等于多少？")  
+        ]  
+    },  
+    config  
+)
+```
+
+#### 1.2.3.3 其他使用方法
+
+在 LangGraph 中，状态快照是类型 StateSnapShot，其中包含以下内容:
+
+```json
+ StateSnapshot(
+	values={'messages': [用户消息, AI回复, 用户消息...]},
+	next=('generate_response',),
+	config={'configurable': {'thread_id': '123', 'checkpoint_id': 'abc'}},
+	metadata={'step': 2, 'source': 'loop', 'writes': {...}},
+	parent_config={'configurable': {'thread_id': '123', 'checkpoint_id':'def...'}},
+```
+
+* 通过 get_state(config) 的方法，获取状态快照；其中，config 中需要指定 thread_id，来表明要获取哪个 thread 的状态快照
+
+* 通过 get_state_history(config)，获取某个线程的所有状态快照，同样需要在 config 中指定 thread_id
+
+* 重放
+
+	* 通过保存某一个时刻的状态快照，可以再次冲这个地方开始，原封不变的重新往下调用（StateSnapShot 中保存着当前的状态值、下一个节点、属性等等）
+
+* 更新属性
+
+	* 使用 update_state，需要先保存需要修改的状态，之后重新指定新的类型即可.
+	* 指定修改具体哪个状态的方法与前面类似，不过这里不是手动构造，而是要传入相应节点状态快照的 config 字段
+
+## 1.2 跨对话持久化
+
+跨对话在思路上与线程持久化类似，但是也有区别：
+
+1. 没有自动触发机制，需要手动 put、get
+2. 线程持久化区分靠的是 thread_id，跨对话持久化靠自己指定的 namespace 区分是谁的数据
+
+跨对话持久化和线程持久化一样，也可以通过 InMemoryStore 或者 PostgresSQL 进行持久化
+
+### 1.2.1 put 方法
+
+在 put 方法中，需要指定三个字段：
+
+* `namespace`，决定这个数据是谁的
+* `memory_id`，标识数据的唯一键，用于 get 方法精确检索某个 namespace 中的数据
+* `memory_value`，数据的值
+
+### 1.2.2 search 方法
+
+返回某个 namespace 下的全部数据，返回的是 List\[StoreResult\]，StoreResult 的结构如下：
+
+```json
+ {
+	'namespace': [
+		'user_123', 'preferences'
+	],
+	'key': 'db826e33-c68c-4669-a79a-3579bff02ff1',
+	'value': {
+		 'favorite_food': '汉堡',
+		 'allergy': '花粉'
+	},
+	'created_at': '2025-12-03T08:16:14.134568+00:00',
+	'updated_at': '2025-12-03T08:16:14.134576+00:00',
+	'score': None
+}
+```
+
+### 1.2.3 get 方法
+
+用来精确的通过 key 检索到某一条数据，格式如：get(namespace, key)
+### 1.2.4 在 LangGraph 中使用 Store
+
+1. 在编译图时，指定编译选项：store=store_name
+2. 任何一个节点函数想要使用 Store 中的内容，需要在参数中声明 config: RunnableConfg 以及 store: BaseStore，在后面的代码中就可以使用 put、search 方法来使用跨对话持久化了（这里的 config，就是我们在调用编译好的图时，指定的 `config = {"configurable": ...}`；store,就是我们在编译图时指定的 `store = store`）
