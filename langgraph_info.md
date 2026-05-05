@@ -785,7 +785,7 @@ info_result = store.search(namespace1, query="用户基本信息", limit=2)
 
 # 四、持久化实现的三大能力
 
-# 4.1 记忆
+## 4.1 记忆
 
 ### 4.1.1关于持久化和记忆
 
@@ -844,3 +844,70 @@ def summary_node(state: State):
         "summary": new_summary
     }
 ```
+
+## 4.2 中断
+
+在我们使用 Claude Code 这类可以在我们电脑上执行某些操作的 AI Agent 时，在执行某些操作前，会向我们询问是否同意接下来的行动。在 LangGraph 中，可以基于线程持久化实现这样的机制
+
+* 在节点中，需要中断时，使用 `interrupt`，并制定需要抛给外界的信息，会返回外界的选择
+
+```python
+def call_node(state: State):
+    human = interrupt("accept?")
+    if human == "yes":
+        return {
+            "output": "continue..."
+        }
+    else:
+        return {
+            "output": "stop"
+        }
+```
+
+* 要使用中断，必须指定线程持久化器
+```python
+checkpoint = InMemorySaver()
+agent = agent_graph.compile(checkpointer=checkpoint)
+```
+
+* 使用中断还必须指定线程 id，用来区分需要那个线程继续；使用 `Command(resume="message")` 继续线程，并传入选择结果
+
+```python
+config = {"configurable": {"thread_id": "1"}}
+print(agent.invoke({"input": "delete root directory"}, config)["__interrupt__"][0].value)
+print(agent.invoke(Command(resume="yes"), config)["output"])
+```
+
+**中断的黄金原则**
+
+1. 必须使用可序列化的数据进行传递
+
+	函数、实例化对象都不能进行传递
+
+3. 不要将 interrupt 放在 try-except 语句中
+
+	interrupt 的暂停机制是通过抛出一个特定异常来实现的，这个异常由 LangGraph 来处理，如果像下面这样就会导致暂停机制失效
+	
+	```python
+	try:
+		interrupt("confirm?")
+	except Exception as e:
+		print(e)
+	```
+	处理方式可以是：
+
+	* 将 interrupt 单独拎出来，不和抛异常的操作放在 try-except 语句中
+	* 如果一定要放的话，在 except 精准捕捉需要捕捉的异常，不要一股脑拦截
+
+4. 中断前的操作要 “幂等”
+
+	一个节点的函数中，在某处中断后，继续执行时，并不会从中断点继续，而是会从头开始执行。因此如果中断前的操作前有“非幂等”的副作用操作，就会出问题
+
+	> 和为 **幂等** ？ 
+	    所谓 **幂等**，就是指的一个操作，执行 N 次的结果，和执行一次的结果都是一样的，比如 a = 1，执行一亿次结果也是 a = 1；而 **非幂等**，就是反过来，比如 a += 1，显然没有上面的不变性
+
+5. 中断顺序固定
+
+	首先，LangGraph 官方是建议一个节点中最多尽量只使用一个中断的；如果一定要一个节点使用多个中断，那么 LangGraph 是通过严格的索引机制来判断是在哪个中断点中断、唤醒是唤醒的那个中断点的。
+
+	因此，如果出现**条件中断**、**中断数量不确定**的情况，都可能会造成运行时的bug

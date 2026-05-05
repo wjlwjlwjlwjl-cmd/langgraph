@@ -16,7 +16,7 @@ def call_node(state: State):
     }
 def summary_node(state: State):
     summary = state.get("summary", "")
-
+    
     if summary:
         prompt = state["messages"] + [HumanMessage(content=f"上面是所有的聊天信息，请根据这些信息扩展如下摘要,并且不要在加上新信息的同时丢失老信息：{summary}")]
     else:

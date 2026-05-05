@@ -3,9 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="dbad508f-0e9b-48fe-b1c6-a9b1f93dcf93" name="更改" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cross_conversation_store.py" beforeDir="false" afterPath="$PROJECT_DIR$/cross_conversation_store.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/langgraph_info.md" beforeDir="false" afterPath="$PROJECT_DIR$/langgraph_info.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tool_example.py" beforeDir="false" afterPath="$PROJECT_DIR$/tool_example.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/summary_message.py" beforeDir="false" afterPath="$PROJECT_DIR$/summary_message.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,6 +44,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.OverWrite.executor": "Run",
+    "Python.ask_to_continue.executor": "Run",
     "Python.cross_conversation_store.executor": "Run",
     "Python.io_schema.executor": "Run",
     "Python.memory_management.executor": "Run",
@@ -126,7 +126,8 @@
       <workItem from="1777941610692" duration="346000" />
       <workItem from="1777943370181" duration="138000" />
       <workItem from="1777944615410" duration="5526000" />
-      <workItem from="1777957432240" duration="4859000" />
+      <workItem from="1777957432240" duration="8778000" />
+      <workItem from="1777987865520" duration="5550000" />
     </task>
     <servers />
   </component>
@@ -135,8 +136,10 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/langgraph$cross_conversation_store.coverage" NAME="memory_management 覆盖结果" MODIFIED="1777950588300" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/langgraph$summary_message.coverage" NAME="summary_message 覆盖结果" MODIFIED="1777992960801" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/langgraph$ask_to_continue.coverage" NAME="ask_to_continue 覆盖结果" MODIFIED="1777993777493" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/langgraph$thread_persistence.coverage" NAME="thread_persistence 覆盖结果" MODIFIED="1777876971458" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
-    <SUITE FILE_PATH="coverage/langgraph$memory_management.coverage" NAME="summary_message 覆盖结果" MODIFIED="1777967292074" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/langgraph$memory_management.coverage" NAME="summary_message 覆盖结果" MODIFIED="1777967351948" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
     <SUITE FILE_PATH="coverage/langgraph$orchestrator_worker.coverage" NAME="orchestrator_worker 覆盖结果" MODIFIED="1777862928058" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>
