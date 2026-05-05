@@ -1,4 +1,5 @@
 from langchain_core.runnables import RunnableConfig
+from langchain_ollama import OllamaEmbeddings
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, AnyMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
@@ -7,6 +8,7 @@ from pydantic import Field, BaseModel
 from langgraph.store.memory import InMemoryStore, BaseStore
 import uuid
 
+#
 model = ChatOpenAI(
     model="qwen-turbo"
 )
@@ -19,7 +21,12 @@ model_with_structured_output = model.with_structured_output(Person)
 
 class State(TypedDict):
     messages: Annotated[str, Field(description="任务输入的描述")]
-store = InMemoryStore()
+embedding = OllamaEmbeddings(model="all-minilm")
+store = InMemoryStore(
+    index={
+        "embed": embedding,
+    }
+)
 
 def get_person_by_llm(state: State, config: RunnableConfig, store: BaseStore):
     info = model_with_structured_output.invoke(
@@ -53,6 +60,9 @@ def get_person_by_llm(state: State, config: RunnableConfig, store: BaseStore):
         height_in_meter = store.search(namespace1)[0].value
     if not like_food:
         like_food = store.search(namespace2)[0].value
+
+    info_result = store.search(namespace1, query="用户基本信息", limit=2)
+    print(info_result)
 
     return {
         "messages": name + ": " + height_in_meter + ": " + like_food

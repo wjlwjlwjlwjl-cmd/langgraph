@@ -3,6 +3,7 @@ from langchain_core.messages import HumanMessage, SystemMessage, AnyMessage, Too
 from langgraph.graph import StateGraph, START, END
 from langchain_core.tools import tool
 from typing import TypedDict, List, Annotated
+from langchain_ollama import OllamaEmbeddings
 import operator
 
 # 定义聊天模型和工具

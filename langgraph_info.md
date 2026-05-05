@@ -621,7 +621,7 @@ def synthesizer(state: State):
 
 前面我们实现的 【案例二】基于 LangGraph 的代理式 RAG 系统 就是评估器、优化器模式，核心在于**质量检测机制**。评估器决定生成结果是否合格，不合格就交给优化器优化问题，重新生成
 
-# 一、LangGraph 持久化
+# 三、LangGraph 持久化
 
 ## 1.1 线程级持久化
 
@@ -761,3 +761,86 @@ result = final_graph.invoke(
 
 1. 在编译图时，指定编译选项：store=store_name
 2. 任何一个节点函数想要使用 Store 中的内容，需要在参数中声明 config: RunnableConfg 以及 store: BaseStore，在后面的代码中就可以使用 put、search 方法来使用跨对话持久化了（这里的 config，就是我们在调用编译好的图时，指定的 `config = {"configurable": ...}`；store,就是我们在编译图时指定的 `store = store`）
+
+### 1.2.5 在 Store 中使用语义检索
+
+store 支持通过在创建时，通过给予嵌入模型的方式，开启 store 的语义检索，通过自然语言就可以获得某条特定的记忆
+
+```python
+embedding = OllamaEmbedding(model="all-minilm")
+store = InMemoryStore(
+    index={
+        "embed": embedding,
+    }
+)
+```
+
+在检索时，直接指定 query 和 目标条数
+
+```python
+info_result = store.search(namespace1, query="用户基本信息", limit=2)
+```
+
+同样，也可以使用 Postgres 存储库进行存储，连接方式方式和线程持久化中相同
+
+# 四、持久化实现的三大能力
+
+# 4.1 记忆
+
+### 4.1.1关于持久化和记忆
+
+* 【持久化】是 LangGraph 的底层能力，包含线程持久化、跨对话持久化
+* 【记忆】是 LangGraph 的应用层能力，包含短期记忆和长期记忆
+
+	在应用层，短期记忆可以使用线程持久化，长期记忆使用跨对话持久化。短期记忆保存但次会话中的上下文信息，而长期记忆保存跨对话的用户或应用数据
+
+### 4.1.2 记忆的管理
+
+#### 4.1.2.1 修剪记忆
+
+可以使用 LangChain 消息管理中的 `trim_messages`，直接返回修剪之后的消息列表
+
+```python
+messages = trim_messages(
+	state["messages"],
+	strategy="last",
+	token_counter=len,
+	max_tokens=10480,
+	start_on="human",
+	end_on=("human", "tool")
+)
+response = model.invoke(messages)
+```
+
+* `strategy` 指定裁剪策略，`last` 表示保留最后消息，从头上裁剪
+* `token_counter` 通过 token 数来进行裁剪，但不是所有模型都支持
+* `max_tokens` 指定最大长度，单位取决于 `token_counter` 的计算函数
+* `start_on`，从什么类型的消息开始裁剪
+* `end_on`，从什么类型的消息结束裁剪，上面表示结束消息为用户消息或者工具消息
+
+#### 4.1.2.2 删除记忆
+
+同样使用 LangChain 消息管理的 RemoveMessage，核心是指定 id，也可以使用 `langgraph.graph.message` 中的 `REMOVE_ALL_MESSAGES` 作为 id 来删除所有记忆
+
+不过需要注意的是，RemoveMessage 是一条指令，而不是直接操作消息列表，第一轮把它返回给 LLM，第二轮才会删减掉历史
+
+#### 4.1.2.3 扩展记忆
+
+大模型的上下文窗口是由限制的。一方面我们可以通过上面的裁剪、删除消息来保证消息不超过上下文窗口；另一方面，这种方式可能会导致我们丢失上下文中的关键信息。
+
+所以我们可以专门引入一个节点来不断的总结，并依据最新的内容不断扩展总结，即类似于一个压缩文件，压缩着我们所有的历史信息
+
+```python
+def summary_node(state: State):
+    summary = state.get("summary", "")
+    if summary:
+        prompt = state["messages"] + [HumanMessage(content=f"上面是所有的聊天信息，请根据这些信息扩展如下摘要,并且请注意新旧信息的完整性：{summary}")]
+    else:
+        prompt = state["messages"] + [HumanMessage(content="请给上面的聊天信息生成一份摘要")]
+    delete_message = [RemoveMessage(id=message.id) for message in state["messages"][:-2]]
+    new_summary = model.invoke(prompt).content
+    return {
+        "messages": delete_message,
+        "summary": new_summary
+    }
+```
