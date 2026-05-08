@@ -33,6 +33,4 @@ agent_graph.add_edge("greet_node", END)
 agent = agent_graph.compile()
 
 # 图运行时传入时传入上下文
-state = State({"user_name": "wjl", "greet": ""})
-context = ContextSchema(language="en")
-print(agent.invoke(state, context=context)["greet"])
+agent.invoke(State(user_name="wjl", greet=""), context=ContextSchema(language="en"))

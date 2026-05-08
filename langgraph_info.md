@@ -914,3 +914,58 @@ print(agent.invoke(Command(resume="yes"), config)["output"])
 ## 4.3 时间旅行
 
 在多个 LLM 共同执行任务、复杂的工作流中，处于容错处理、工作流程跟踪等目的，我们可能会需要让执行流原封不动的回到某个已经执行过的节点重新执行。想要实现这种操作，就得益于 LangGraph 的线程持久化——使用 `get_state_history` 获得所有状态（前面说过，保存着当前的所有状态值、下一个节点、config 配置），然后如果需要的话，还可以使用 `update_state` 来修改状态。
+
+# 五、上下文
+
+上下文包括可以按照两种方式分类：**可变性**，**生命周期**
+
+按照可变性分类，可以分为静态上下文（例如数据库链接、用户 id 等），和动态上下文（即在运行时会发生改变的各种信息）；按照生命周期划分，可以分为运行时上下文（仅在单次运行时有效，比如在 LangGraph 的线程）、跨对话上下文（多次会话中都被保存下来的信息，比如用户偏好等）
+
+## 5.1 运行时上下文
+
+### 5.1.1 在图中使用运行时上下文
+
+在 LangGraph 中，可以使用 `@dataclass` 装饰器或者 `TypedDict`，来创建运行时上下文的数据结构
+
+```python
+@dataclass
+class ContextSchema():
+	language: str = "en"
+```
+
+创建完运行时上下文结构之后，要在图中使用上下文模式，需要通过 `context_schema` 指定我们的上下文数据结构
+
+```python
+agent_graph = StateGraph(State, context_schema=ContextSchema)
+```
+
+在节点中，使用上下文数据，使用 `runtime` 参数来使用上下文：
+
+```python
+def greet_node(state: State, runtime: Runtime[ContextSchema]):
+	#...
+```
+
+最后调用图时，传入上下文即可
+
+```python
+agent = agent_graph.invoke()
+agent.invoke(State(user_name="wjl", greet=""), context=ContextSchema(language="en"))
+```
+
+### 5.1.2 让工具获得运行时上下文
+
+通过 runtime 参数，通过 `ToolRuntime[ContextSchema]` ，让工具获得 `State` `Context` 等数据结构中包含的上下文数据
+
+```python
+@tool
+def search(runtime: ToolRuntime[ContextSchema]):
+	state = runtime.state
+	context = runtime.context
+```
+
+同时，在图中，工具还可以与 `ToolNode` 构造工具节点、`tools_condition` 根据是否包含 `ToolMessage` 自动选择节点等机制配合使用
+
+# 六、流与流模式
+
+在 LangChain 的各种 LLM 对象中，使用流式调用，会以字节为单位输出内容，但是
