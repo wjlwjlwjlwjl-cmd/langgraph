@@ -968,4 +968,38 @@ def search(runtime: ToolRuntime[ContextSchema]):
 
 # 六、流与流模式
 
-在 LangChain 的各种 LLM 对象中，使用流式调用，会以字节为单位输出内容，但是
+在 LangChain 的各种 LLM 对象中，使用流式调用，会以字节为单位输出内容。但是在 LangGraph 中，对于工作流的流式调用是以节点为单位进行的。除此之外我们还有其他需求，比如只注意更新了那些状态、所有状态的情况、自定义状态的输出格式等等
+
+## 6.1 updates
+
+`updates` 模式下，只会在流式输出时输出所有更新了的状态的情况
+
+```python
+for chunk in agent.stream({}, stream_mode="updates"):
+	print(chunk)
+```
+
+## 6.2 values
+
+`values` 是默认处理，无论是否发生了改变，都会进行流失输出
+
+## 6.3 custom
+
+允许自己定义流式输出的内容，需要先获取流式输出器，然后在需要的地方为流式输出器提供 json 格式的输出内容即可
+
+```python
+from langgraph.config import get_stream_writer
+def call_node(state: State):
+	writer = get_stream_writer()
+	writer({
+		"tool_name": "...",
+		"msg": "before calling"
+	})
+# ......
+for chunk in agent.invoke({}, stream_mode="messages"):
+	print(chunk)
+```
+
+## 6.4 messages
+
+使用 `messages` j j j j j j j j j j j jiu
