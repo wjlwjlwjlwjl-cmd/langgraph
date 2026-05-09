@@ -1002,4 +1002,12 @@ for chunk in agent.invoke({}, stream_mode="messages"):
 
 ## 6.4 messages
 
-使用 `messages` j j j j j j j j j j j jiu
+使用 `messages` 就可以实现让工作流的流式传输以 Token 为单位，而不是以节点为单位
+
+```python
+for chunk in model.stream({}, stream_mode="messages"):
+	print(chunk)
+```
+
+### 6.4.1 实现 LLM 的流式令牌筛选
+
