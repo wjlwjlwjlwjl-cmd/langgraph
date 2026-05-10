@@ -1044,3 +1044,15 @@ for token_chunk, metadata in agent.stream({"topic": "programmer"}, stream_mode="
 ```
 
 这样就可以筛选出令牌符合的模型输出的内容，并且是通过流式的方式
+
+# 七、子图
+
+`LangGraph`中，允许我们在一张图中，调用另一张图，将图的设计模块化。这张被一个图中某个节点调用的图，就叫做子图。子图的状态、结构，对于主图是不可见的，主图只可以获得子图返回的结果
+
+流式传输中，默认不返回子图调用中返回的内容，如果需要的话，通过 `subgraphs=True` 开启
+
+```python
+for token_chunk in parent_agent.stream({}, subgraphs=True):
+    print(token_chunk)
+```
+
