@@ -30,5 +30,4 @@ agent = (StateGraph(State)
 for token_chunk, metadata in agent.stream({"topic": "programmer"}, stream_mode="messages"):
     tag = metadata["tags"][0]
     if tag == "joke":
-        print(token_chunk["joke"])
-    
+        print(metadata)

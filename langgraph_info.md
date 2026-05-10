@@ -1011,3 +1011,36 @@ for chunk in model.stream({}, stream_mode="messages"):
 
 ### 6.4.1 实现 LLM 的流式令牌筛选
 
+```python
+model_joke = ChatOpenAI(
+	model="qwen-turbo",
+	model_kwargs={"tags": ["joke"]}
+)
+model_poem = ChatOpenAI(
+	model="qwen-turbo",
+	model_kwargs={"tags": ["poem"]}
+)
+class State(TypedDict):
+	topic: str
+	joke: str
+	poem: str
+def call_node(state: State):
+	topic = state["topic"]
+	joke = model_joke.invoke(f"write to a joke about {topic}").content
+	poem = model_joke.invoke(f"write to a poem about {topic}").content
+return {
+	"joke": joke,
+	"poem": poem
+}
+agent = (StateGraph(State)
+	.add_node(call_node)
+	.add_edge(START, "call_node")
+	.add_edge("call_node", END)
+	.compile())
+for token_chunk, metadata in agent.stream({"topic": "programmer"}, stream_mode="messages"):
+	tag = metadata["tags"][0]
+	if tag == "joke":
+	print(token_chunk.content, end="")
+```
+
+这样就可以筛选出令牌符合的模型输出的内容，并且是通过流式的方式
