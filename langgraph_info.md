@@ -1047,12 +1047,50 @@ for token_chunk, metadata in agent.stream({"topic": "programmer"}, stream_mode="
 
 # 七、子图
 
-`LangGraph`中，允许我们在一张图中，调用另一张图，将图的设计模块化。这张被一个图中某个节点调用的图，就叫做子图。子图的状态、结构，对于主图是不可见的，主图只可以获得子图返回的结果
+## 7.1 子图的使用方式
+
+`LangGraph`中，允许我们在一张图中，调用另一张图，将图的设计模块化。这张被一个图中某个节点调用的图，就叫做子图。子图的状态、结构，对于主图是不可见的，主图只可以获得子图返回的结果；调用子图，也只需要像调用普通编译后的图一样使用 `invoke` 方法即可
 
 流式传输中，默认不返回子图调用中返回的内容，如果需要的话，通过 `subgraphs=True` 开启
+
+## 7.1.1 主图节点调用子图(状态节点私有)
 
 ```python
 for token_chunk in parent_agent.stream({}, subgraphs=True):
     print(token_chunk)
 ```
 
+## 7.1.2 子图作为主图节点（共享状态）
+
+```python
+    sub_agent = (
+        StateGraph(SubState)
+        .add_node(sub_node1)
+        .add_node(sub_node2)
+        .add_edge("sub_node1", "sub_node2")
+        .add_edge(START, "sub_node1")
+        .compile()
+    )
+
+    parent_agent = (
+        StateGraph(ParentState)
+        .add_node("node1", parent_node)
+        .add_node("node2", sub_agent) # 将这个子图作为节点加入主图，子图可以共享主图的状态
+        .add_edge(START, "node1")
+        .add_edge("node1", "node2")
+        .compile()
+    )
+```
+
+## 7.2 在子图中使用中断
+
+子图中，中断的使用、短期记忆的传入，都正常使用即可，但是子图的状态只能在中断时获取,恢复后，将无法访问子图状态
+
+### 子图中断的恢复原则
+
+* 前面提到过，中断在节点内部时，恢复时会在这个节点从头执行，因此中断前的操作需要幂等
+
+* 在子图这里，有一些区别，根据子图和主图的关系：
+
+    * 如果子图作为主图的一个节点被调用，并且中断发生在这个子图内部，那么恢复时，会从子图中调用中断的节点从头执行
+    * 如果是主图的一个节点内部调用了子图，并且中断发生在子图内部，那么恢复时，会从这个主图节点从头执行
